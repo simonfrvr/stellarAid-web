@@ -12,5 +12,8 @@ export {
   setAuthTokenProvider,
   setTokenRefresher,
   setUnauthorizedHandler,
+  toApiError,
 } from './http'
 export type { AuthTokenProvider, Http, TokenRefresher, UnauthorizedHandler } from './http'
+export { withErrorHandling } from './withErrorHandling'
+export type { ApiHandler } from './withErrorHandling'

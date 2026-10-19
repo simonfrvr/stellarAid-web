@@ -23,10 +23,15 @@ export default defineConfig({
     chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ['react', 'react-dom', 'react-router-dom'],
-          query: ['@tanstack/react-query'],
-          stellar: ['@stellar/freighter-api'],
+        // Rolldown (Vite 8) only accepts the function form of manualChunks.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return null
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router-dom|scheduler)[\\/]/.test(id)) {
+            return 'react'
+          }
+          if (id.includes('@tanstack/react-query')) return 'query'
+          if (id.includes('@stellar/freighter-api')) return 'stellar'
+          return null
         },
       },
     },

@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useId, useRef } from 'react'
 import { Spinner } from '@/components/ui'
+import { fileNameFromUrl, getImageAltText, MAX_ALT_TEXT_LENGTH } from './imageAlt'
 
 interface ImageUploadProps {
   /** Current image URL to display */
@@ -24,10 +25,32 @@ interface ImageUploadProps {
   error?: string | null
   /** Disabled state */
   disabled?: boolean
+  /**
+   * User-provided description of the image. Controlled when supplied; the
+   * component keeps its own draft value otherwise.
+   */
+  altText?: string
+  /** Called with the new description whenever the user edits it. */
+  onAltTextChange?: (altText: string) => void
+  /** Description used only when the user has not supplied alt text. */
+  fallbackAltText?: string
+  /** Maximum number of characters accepted in the description field. */
+  maxAltTextLength?: number
 }
 
 const DEFAULT_MAX_SIZE = 10 * 1024 * 1024 // 10MB
 const DEFAULT_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+
+function validateFile(file: File, acceptedTypes: string[], maxSize: number): string | null {
+  if (!acceptedTypes.includes(file.type)) {
+    return `File type "${file.type}" is not allowed. Accepted: ${acceptedTypes.join(', ')}`
+  }
+  if (file.size > maxSize) {
+    const maxSizeMB = (maxSize / (1024 * 1024)).toFixed(1)
+    return `File size exceeds maximum of ${maxSizeMB}MB`
+  }
+  return null
+}
 
 export default function ImageUpload({
   currentImage,
@@ -41,20 +64,24 @@ export default function ImageUpload({
   uploadProgress = 0,
   error = null,
   disabled = false,
+  altText,
+  onAltTextChange,
+  fallbackAltText,
+  maxAltTextLength = MAX_ALT_TEXT_LENGTH,
 }: ImageUploadProps) {
   const [dragActive, setDragActive] = useState(false)
+  const [internalAltText, setInternalAltText] = useState('')
+  const [selectedFileName, setSelectedFileName] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const validateFile = (file: File): string | null => {
-    if (!acceptedTypes.includes(file.type)) {
-      return `File type "${file.type}" is not allowed. Accepted: ${acceptedTypes.join(', ')}`
-    }
-    if (file.size > maxSize) {
-      const maxSizeMB = (maxSize / (1024 * 1024)).toFixed(1)
-      return `File size exceeds maximum of ${maxSizeMB}MB`
-    }
-    return null
-  }
+  const altInputId = useId()
+  const altHintId = `${altInputId}-hint`
+  const altValue = altText ?? internalAltText
+  const resolvedAltText = getImageAltText({
+    altText: altValue,
+    fallbackAltText,
+    fileName: selectedFileName || fileNameFromUrl(currentImage),
+    label,
+  })
 
   const handleFiles = useCallback(
     (files: FileList | File[]) => {
@@ -62,16 +89,26 @@ export default function ImageUpload({
       if (fileArray.length === 0) return
 
       const file = fileArray[0]!
-      const validationError = validateFile(file)
+      const validationError = validateFile(file, acceptedTypes, maxSize)
 
       if (validationError) {
         alert(validationError)
         return
       }
 
+      setSelectedFileName(file.name)
       onFileSelect(file)
     },
-    [acceptedTypes, maxSize, onFileSelect]
+    [acceptedTypes, maxSize, onFileSelect],
+  )
+
+  const handleAltTextChange = useCallback(
+    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = event.target.value
+      if (altText === undefined) setInternalAltText(value)
+      onAltTextChange?.(value)
+    },
+    [altText, onAltTextChange],
   )
 
   const handleDrop = useCallback(
@@ -83,16 +120,19 @@ export default function ImageUpload({
         handleFiles(e.dataTransfer.files)
       }
     },
-    [disabled, handleFiles]
+    [disabled, handleFiles],
   )
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!disabled) {
-      setDragActive(true)
-    }
-  }, [disabled])
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (!disabled) {
+        setDragActive(true)
+      }
+    },
+    [disabled],
+  )
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -106,7 +146,7 @@ export default function ImageUpload({
         handleFiles(e.target.files)
       }
     },
-    [handleFiles]
+    [handleFiles],
   )
 
   const handleClick = useCallback(() => {
@@ -118,9 +158,12 @@ export default function ImageUpload({
   const handleRemove = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
+      setSelectedFileName('')
+      if (altText === undefined) setInternalAltText('')
+      onAltTextChange?.('')
       onRemove?.()
     },
-    [onRemove]
+    [altText, onAltTextChange, onRemove],
   )
 
   const formatFileSize = (bytes: number): string => {
@@ -180,10 +223,10 @@ export default function ImageUpload({
           <div className="relative">
             <img
               src={currentImage}
-              alt="Current upload"
+              alt={resolvedAltText}
               className="w-full h-48 object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none'
+                ;(e.target as HTMLImageElement).style.display = 'none'
               }}
             />
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity">
@@ -230,10 +273,45 @@ export default function ImageUpload({
         )}
       </div>
 
+      {/* Alt text - editable before and after the upload completes (#999). */}
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={altInputId} className="flex flex-col gap-1.5">
+          <span className="flex items-center justify-between gap-3">
+            <span className="text-caption-sm font-semibold text-foreground">
+              Image description (alt text)
+            </span>
+            <span className="text-caption-xs text-muted">
+              {altValue.length}/{maxAltTextLength}
+            </span>
+          </span>
+          <textarea
+            id={altInputId}
+            rows={2}
+            value={altValue}
+            onChange={handleAltTextChange}
+            maxLength={maxAltTextLength}
+            disabled={disabled}
+            aria-describedby={altHintId}
+            placeholder="Describe what this image shows, e.g. a ceramic bowl with blue glaze"
+            className="w-full rounded-control border border-line bg-surface px-3.5 py-2.5 text-body text-foreground placeholder:text-muted focus-visible:shadow-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+        <p id={altHintId} className="text-caption-xs text-muted">
+          Describe the image for screen readers. If left blank, a description is generated from the
+          field label or file name.
+        </p>
+      </div>
+
       {/* Error Message */}
       {error && (
         <p className="text-caption-sm text-danger flex items-center gap-1">
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -244,7 +322,8 @@ export default function ImageUpload({
 
       {/* File Requirements */}
       <p className="text-caption-xs text-muted">
-        Max size: {formatFileSize(maxSize)} • Formats: {acceptedTypes.map((t) => t.split('/')[1]).join(', ')}
+        Max size: {formatFileSize(maxSize)} • Formats:{' '}
+        {acceptedTypes.map((t) => t.split('/')[1]).join(', ')}
       </p>
     </div>
   )

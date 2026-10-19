@@ -1,5 +1,3 @@
-import type { KeyboardEvent } from 'react'
-
 export interface ArtistCardProps {
   id: string
   displayName: string
@@ -10,8 +8,10 @@ export interface ArtistCardProps {
 }
 
 /**
- * Focusable artist card for grid layouts (#935).
- * Supports Tab focus, Enter/Space activation, and an accessible name.
+ * Focusable artist card (#993).
+ *
+ * A native `<button>` supplies Tab focus and Enter/Space activation, and is
+ * valid on its own instead of pretending to be a `gridcell` without a grid.
  */
 export default function ArtistCard({
   id,
@@ -23,47 +23,38 @@ export default function ArtistCard({
 }: ArtistCardProps) {
   const activate = () => onActivate?.(id)
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      activate()
-    }
-  }
-
   return (
-    <div
-      role="gridcell"
+    <button
+      type="button"
       aria-roledescription="artist card"
       aria-label={headline ? `${displayName}, ${headline}` : displayName}
-      tabIndex={0}
       onClick={activate}
-      onKeyDown={onKeyDown}
-      className={`cursor-pointer rounded-card border border-line bg-surface p-4 shadow-card outline-none transition hover:shadow-elevated focus-visible:shadow-focus-ring ${className}`}
+      className={`w-full cursor-pointer rounded-card border border-line bg-surface p-4 text-left shadow-card outline-none transition hover:shadow-elevated focus-visible:shadow-focus-ring ${className}`}
     >
-      <div className="flex items-center gap-3">
+      <span className="flex items-center gap-3">
         {avatarUrl ? (
           <img
             src={avatarUrl}
-            alt=""
+            alt={`${displayName} avatar`}
             className="h-12 w-12 rounded-full object-cover"
           />
         ) : (
-          <div
-            aria-hidden
+          <span
+            aria-hidden="true"
             className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted text-body font-semibold text-muted"
           >
             {displayName.slice(0, 1).toUpperCase()}
-          </div>
+          </span>
         )}
-        <div className="min-w-0">
-          <p className="truncate text-body font-semibold text-foreground">
+        <span className="min-w-0">
+          <span className="block truncate text-body font-semibold text-foreground">
             {displayName}
-          </p>
+          </span>
           {headline ? (
-            <p className="truncate text-caption text-muted">{headline}</p>
+            <span className="block truncate text-caption text-muted">{headline}</span>
           ) : null}
-        </div>
-      </div>
-    </div>
+        </span>
+      </span>
+    </button>
   )
 }

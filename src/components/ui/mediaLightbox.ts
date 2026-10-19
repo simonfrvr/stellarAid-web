@@ -1,4 +1,6 @@
-export function normalizeImageList(images: Array<string | null | undefined> | null | undefined): string[] {
+export function normalizeImageList(
+  images: Array<string | null | undefined> | null | undefined,
+): string[] {
   return (images ?? [])
     .map((image) => (typeof image === 'string' ? image.trim() : ''))
     .filter((image) => image.length > 0)
@@ -9,12 +11,17 @@ export function clampIndex(index: number, total: number): number {
   return Math.min(Math.max(index, 0), total - 1)
 }
 
-export function getAdjacentIndices(index: number, total: number): { previous: number; next: number } {
+export function getAdjacentIndices(
+  index: number,
+  total: number,
+): { previous: number; next: number } {
   const safeTotal = total <= 0 ? 1 : total
   const safeIndex = clampIndex(index, safeTotal)
 
+  // Navigation wraps at both ends so the first image can reach the last and
+  // vice versa, which is what the arrow-key and swipe handlers expect.
   return {
-    previous: clampIndex(safeIndex - 1, safeTotal),
-    next: clampIndex(safeIndex + 1, safeTotal),
+    previous: (safeIndex - 1 + safeTotal) % safeTotal,
+    next: (safeIndex + 1) % safeTotal,
   }
 }

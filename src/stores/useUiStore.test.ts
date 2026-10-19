@@ -45,6 +45,22 @@ describe('useUiStore toasts', () => {
     expect(useUiStore.getState().toasts).toHaveLength(0)
   })
 
+  it('pauses and resumes auto-dismiss without losing the remaining time', () => {
+    useUiStore.getState().pushToast('pause me')
+    const first = useUiStore.getState().toasts[0]
+    expect(first).toBeDefined()
+    if (!first) return
+
+    vi.advanceTimersByTime(2000)
+    useUiStore.getState().pauseToast(first.id)
+    vi.advanceTimersByTime(TOAST_DURATION_MS)
+    expect(useUiStore.getState().toasts).toHaveLength(1)
+
+    useUiStore.getState().resumeToast(first.id)
+    vi.advanceTimersByTime(TOAST_DURATION_MS - 2000)
+    expect(useUiStore.getState().toasts).toHaveLength(0)
+  })
+
   it('clears the auto-dismiss timer when dismissed manually', () => {
     const clearSpy = vi.spyOn(globalThis, 'clearTimeout')
 
@@ -66,7 +82,15 @@ describe('useUiStore toasts', () => {
 })
 
 describe('useUiStore shape', () => {
-  it('only exposes the toast state (no unused theme, mobile menu or modal slices)', () => {
-    expect(Object.keys(useUiStore.getState()).sort()).toEqual(['dismissToast', 'pushToast', 'toasts'])
+  it('exposes the toast lifecycle and mobile menu state the app consumes', () => {
+    expect(Object.keys(useUiStore.getState()).sort()).toEqual([
+      'dismissToast',
+      'isMobileMenuOpen',
+      'pauseToast',
+      'pushToast',
+      'resumeToast',
+      'setMobileMenuOpen',
+      'toasts',
+    ])
   })
 })
