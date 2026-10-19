@@ -21,32 +21,32 @@ This repository is the Lumora web client - React + TypeScript on Vite with stric
 Routes are declared in `src/App.tsx`. "Auth" means the route is wrapped in `RequireAuth`; "Guest" means it is only
 for signed-out users. `src/docs.test.ts` fails if this table and the router drift apart.
 
-| Path                               | Access | Screen                   |
-| ---------------------------------- | ------ | ------------------------ |
-| `/`                                | Public | Landing page             |
-| `/login`                           | Guest  | Sign in                  |
-| `/register`                        | Guest  | Create an account        |
-| `/forgot-password`                 | Guest  | Request a password reset |
-| `/reset-password`                  | Guest  | Set a new password       |
-| `/verify-email`                    | Public | Verify an email address  |
-| `/artists/:username`               | Public | Artist profile           |
-| `/category/:slug`                  | Public | Category landing page    |
-| `/profile/edit`                    | Auth   | Edit your profile        |
-| `/dashboard`                       | Auth   | Dashboard                |
-| `/artist`                          | Artist | Artist dashboard         |
-| `/artist/listings`                 | Auth   | My listings              |
-| `/artist/listings/new`             | Auth   | Create a listing         |
-| `/artist/listings/:listingId/edit` | Auth   | Edit a listing           |
-| `/checkout/:artworkId`             | Auth   | Checkout                 |
-| `/payment/result`                  | Auth   | Payment result           |
-| `/order/confirmation`              | Auth   | Order confirmation       |
-| `/purchases`                       | Auth   | Purchase history         |
-| `/favorites`                       | Auth   | Favorites                |
-| `/transactions`                    | Auth   | Transaction history      |
-| `/earnings/withdraw`               | Auth   | Withdraw earnings        |
-| `/settings/wallets`                | Auth   | Linked wallets           |
-| `/style-guide`                     | Dev only | Design system reference |
-| `*`                                | Public | Not found                |
+| Path                               | Access   | Screen                   |
+| ---------------------------------- | -------- | ------------------------ |
+| `/`                                | Public   | Landing page             |
+| `/login`                           | Guest    | Sign in                  |
+| `/register`                        | Guest    | Create an account        |
+| `/forgot-password`                 | Guest    | Request a password reset |
+| `/reset-password`                  | Guest    | Set a new password       |
+| `/verify-email`                    | Public   | Verify an email address  |
+| `/artists/:username`               | Public   | Artist profile           |
+| `/category/:slug`                  | Public   | Category landing page    |
+| `/profile/edit`                    | Auth     | Edit your profile        |
+| `/dashboard`                       | Auth     | Dashboard                |
+| `/artist`                          | Artist   | Artist dashboard         |
+| `/artist/listings`                 | Auth     | My listings              |
+| `/artist/listings/new`             | Auth     | Create a listing         |
+| `/artist/listings/:listingId/edit` | Auth     | Edit a listing           |
+| `/checkout/:artworkId`             | Auth     | Checkout                 |
+| `/payment/result`                  | Auth     | Payment result           |
+| `/order/confirmation`              | Auth     | Order confirmation       |
+| `/purchases`                       | Auth     | Purchase history         |
+| `/favorites`                       | Auth     | Favorites                |
+| `/transactions`                    | Auth     | Transaction history      |
+| `/earnings/withdraw`               | Auth     | Withdraw earnings        |
+| `/settings/wallets`                | Auth     | Linked wallets           |
+| `/style-guide`                     | Dev only | Design system reference  |
+| `*`                                | Public   | Not found                |
 
 ## Tech Stack
 
@@ -69,20 +69,20 @@ The app is served at `http://localhost:5173`.
 
 ## Scripts
 
-| Script                 | Description                                                                       |
-| ---------------------- | --------------------------------------------------------------------------------- |
-| `npm run dev`          | Start the Vite dev server with HMR                                                |
-| `npm run build`        | Build the production bundle with Vite (run `type-check` separately)               |
-| `npm run preview`      | Serve the production build locally                                                |
-| `npm run lint`         | Lint the codebase with ESLint                                                     |
-| `npm run format`       | Format the codebase with Prettier                                                 |
-| `npm run format:check` | Check formatting without writing (CI-friendly)                                    |
-| `npm run type-check`   | Run `tsc -b` (a project-references build)                                         |
-| `npm run test`         | Run the Vitest unit and component tests once                                      |
-| `npm run test:watch`   | Run Vitest in watch mode                                                          |
-| `npm run test:coverage`| Run the tests once and collect a coverage report                                  |
-| `npm run check`        | Run every gate CONTRIBUTING.md mandates (lint, format, types, test, build)        |
-| `npm run prepare`      | Installs the Husky git hooks (runs automatically on `npm install` / `npm ci`)     |
+| Script                  | Description                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `npm run dev`           | Start the Vite dev server with HMR                                            |
+| `npm run build`         | Build the production bundle with Vite (run `type-check` separately)           |
+| `npm run preview`       | Serve the production build locally                                            |
+| `npm run lint`          | Lint the codebase with ESLint                                                 |
+| `npm run format`        | Format the codebase with Prettier                                             |
+| `npm run format:check`  | Check formatting without writing (CI-friendly)                                |
+| `npm run type-check`    | Run `tsc -b` (a project-references build)                                     |
+| `npm run test`          | Run the Vitest unit and component tests once                                  |
+| `npm run test:watch`    | Run Vitest in watch mode                                                      |
+| `npm run test:coverage` | Run the tests once and collect a coverage report                              |
+| `npm run check`         | Run every gate CONTRIBUTING.md mandates (lint, format, types, test, build)    |
+| `npm run prepare`       | Installs the Husky git hooks (runs automatically on `npm install` / `npm ci`) |
 
 ## Environment Variables
 
@@ -93,38 +93,31 @@ the `VITE_` prefix and are defined in a `.env` file - copy `.env.example` to get
 > anyone who loads the site can read them. Never put a secret (API keys, signing keys, passwords) in a `VITE_*`
 > variable; secrets belong on a server.
 
-| Variable                   | Default                 | Required           | Description                                                   |
-| -------------------------- | ----------------------- | ------------------ | ------------------------------------------------------------- |
-| `VITE_API_URL`             | `http://localhost:4000` | Dev: yes. Prod: no | Base URL of the Lumora backend API                            |
-| `VITE_STELLAR_NETWORK`     | `testnet`               | Dev: yes. Prod: no | Stellar network: `testnet` or `mainnet`                       |
-| `VITE_APP_URL`             | `http://localhost:5173` | Dev: yes. Prod: no | Public URL the web app is served from                         |
-| `VITE_FF_MESSAGING`        | unset (flag is off)     | No                 | Feature flag override for messaging: `true` or `false`        |
-| `VITE_FF_NOTIFICATIONS`    | unset (flag is off)     | No                 | Feature flag override for notifications: `true` or `false`    |
-| `VITE_FF_ADVANCED_FILTERS` | unset (flag is off)     | No                 | Feature flag override for advanced filters: `true` or `false` |
+| Variable                   | Default             | Required | Description                                                   |
+| -------------------------- | ------------------- | -------- | ------------------------------------------------------------- |
+| `VITE_API_URL`             | none                | **Yes**  | Base URL of the Lumora backend API                            |
+| `VITE_STELLAR_NETWORK`     | none                | **Yes**  | Stellar network: `testnet` or `mainnet`                       |
+| `VITE_APP_URL`             | none                | **Yes**  | Public URL the web app is served from                         |
+| `VITE_FF_MESSAGING`        | unset (flag is off) | No       | Feature flag override for messaging: `true` or `false`        |
+| `VITE_FF_NOTIFICATIONS`    | unset (flag is off) | No       | Feature flag override for notifications: `true` or `false`    |
+| `VITE_FF_ADVANCED_FILTERS` | unset (flag is off) | No       | Feature flag override for advanced filters: `true` or `false` |
 
 The flag variables accept only `true` or `false`; anything else counts as unset, which leaves the flag at its safe
 default (off). See `src/config/featureFlags.ts`.
 
 ### How validation actually behaves
 
-Validation is gated on `import.meta.env.DEV` in `src/config/env.ts`:
+`src/config/env.ts` validates the required variables in **every environment**, including production builds:
 
-- **Development (`npm run dev`)**: a missing or invalid `VITE_API_URL`, `VITE_STELLAR_NETWORK` or `VITE_APP_URL` is
-  reported with a clear message and `main.tsx` renders `ConfigErrorScreen` instead of the app. The dev server itself
-  still starts; it is the page that refuses to render.
-- **Production builds**: nothing is required. Anything missing falls back to its default. An invalid value (for
-  example a malformed URL) makes `envSchema.parse` throw while the module loads, **before** `main.tsx` can read
-  `configError`, so the user gets a blank page rather than `ConfigErrorScreen`.
+- A missing or blank `VITE_API_URL`, `VITE_STELLAR_NETWORK` or `VITE_APP_URL` is reported with a clear message.
+- Malformed values (for example a URL without a scheme, or an unknown network) are rejected rather than silently
+  replaced.
+- `main.tsx` renders `ConfigErrorScreen` instead of mounting the application, so a misconfigured deployment fails
+  closed instead of pointing every request at `localhost` or quietly running on testnet.
+- The validation error no longer throws while the module loads, so the error screen is always reachable.
 
-Two defaults are footguns in production:
-
-- `VITE_STELLAR_NETWORK` silently defaults to **`testnet`**. A mainnet deployment that forgets this variable runs on
-  testnet with no warning.
-- `VITE_API_URL` defaults to **`http://localhost:4000`**, so a production build without it points every request at
-  the visitor's own machine.
-
-Always set all three explicitly in your deployment environment. Making production fail closed is tracked as a
-follow-up.
+There are no production defaults for the three required variables. Set all of them explicitly in every deployment
+environment. The app shell still starts; it is the page that refuses to render until the configuration is fixed.
 
 `.env` is git-ignored; only `.env.example` is committed. Never read `import.meta.env` directly outside
 `src/config/env.ts` - import `{ env }` from `@/config` instead.

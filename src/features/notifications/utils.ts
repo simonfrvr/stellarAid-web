@@ -110,7 +110,9 @@ export function filterNotifications(
 
 /** Ids of every notification in a page that is currently unread. */
 export function unreadIds(notifications: readonly Notification[]): string[] {
-  return notifications.filter((notification) => !notification.read).map((notification) => notification.id)
+  return notifications
+    .filter((notification) => !notification.read)
+    .map((notification) => notification.id)
 }
 
 /**
@@ -147,20 +149,19 @@ export function adjustUnreadCount(
   read: boolean,
 ): number {
   const targets = new Set(ids)
-  let before = 0
-  let after = 0
+  let delta = 0
 
   for (const page of pages) {
     for (const notification of page.items) {
       if (!targets.has(notification.id)) continue
-      if (notification.read) continue
-      before += 1
-      if (read) continue
-      after += 1
+      // Only what actually changes state contributes to the badge: unread ->
+      // read decrements, read -> unread increments, and unchanged stays put.
+      if (read && !notification.read) delta -= 1
+      else if (!read && notification.read) delta += 1
     }
   }
 
-  return Math.max(0, current + (after - before))
+  return Math.max(0, current + delta)
 }
 
 /** An empty page with the shape the hooks and views expect. */

@@ -131,7 +131,9 @@ export function normalizeAttachments(payload: unknown): MessageAttachment[] {
     if (!isNonEmptyString(record.url) || !isSafePreviewUrl(record.url)) continue
 
     const size = typeof record.size === 'number' ? record.size : Number(record.size)
-    const contentType = isNonEmptyString(record.contentType) ? record.contentType : 'application/octet-stream'
+    const contentType = isNonEmptyString(record.contentType)
+      ? record.contentType
+      : 'application/octet-stream'
 
     attachments.push({
       id: record.id,
@@ -196,7 +198,10 @@ export function createPendingMessage(
  */
 export function appendPending(messages: Message[], pending: Message): Message[] {
   if (messages.some((message) => message.id === pending.id)) return messages
-  return sortByCreatedAt([...messages, pending])
+  // Keep confirmed messages in chat order, but pin the optimistic entry to the
+  // end: it is the newest thing the user just did, even if a skewed clock makes
+  // its `createdAt` look older than a message that arrived meanwhile.
+  return [...sortByCreatedAt(messages), pending]
 }
 
 /**
@@ -206,7 +211,11 @@ export function appendPending(messages: Message[], pending: Message): Message[] 
  * jump. A pending id that is no longer present is ignored rather than appended,
  * because a dismissed failed send must not reappear on its own.
  */
-export function confirmPending(messages: Message[], pendingId: string, saved: Omit<Message, 'status'>): Message[] {
+export function confirmPending(
+  messages: Message[],
+  pendingId: string,
+  saved: Omit<Message, 'status'>,
+): Message[] {
   const index = messages.findIndex((message) => message.id === pendingId)
   if (index === -1) return messages
 

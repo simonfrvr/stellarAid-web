@@ -7,13 +7,13 @@ export const stellarNetworkSchema = z.enum(['testnet', 'mainnet'])
  * Runtime environment configuration. All variables use the `VITE_` prefix and are
  * read from `import.meta.env` (see `.env.example`).
  *
- * A default is provided for production safety so the app can still boot with a
- * reasonable configuration when a variable has not been supplied at build time.
+ * Required variables deliberately have no defaults: silently pointing a
+ * production build at `localhost` is worse than refusing to boot (#997).
  */
 const envSchema = z.object({
-  VITE_API_URL: z.url().default('http://localhost:4000'),
-  VITE_STELLAR_NETWORK: stellarNetworkSchema.default('testnet'),
-  VITE_APP_URL: z.url().default('http://localhost:5173'),
+  VITE_API_URL: z.url(),
+  VITE_STELLAR_NETWORK: stellarNetworkSchema,
+  VITE_APP_URL: z.url(),
   // Optional feature-flag overrides ("true"/"false"); anything else counts as unset.
   VITE_FF_MESSAGING: z.stringbool().optional().catch(undefined),
   VITE_FF_NOTIFICATIONS: z.stringbool().optional().catch(undefined),
@@ -23,15 +23,39 @@ const envSchema = z.object({
 export type StellarNetwork = z.infer<typeof stellarNetworkSchema>
 export type AppEnv = z.infer<typeof envSchema>
 
-const REQUIRED_KEYS = ['VITE_API_URL', 'VITE_STELLAR_NETWORK', 'VITE_APP_URL'] as const
-type EnvKey = (typeof REQUIRED_KEYS)[number]
+/** Variables the app cannot run without, in any environment. */
+export const REQUIRED_ENV_KEYS = ['VITE_API_URL', 'VITE_STELLAR_NETWORK', 'VITE_APP_URL'] as const
+
+type EnvKey = (typeof REQUIRED_ENV_KEYS)[number]
 type FlagEnvKey = 'VITE_FF_MESSAGING' | 'VITE_FF_NOTIFICATIONS' | 'VITE_FF_ADVANCED_FILTERS'
+export type RawEnv = Partial<Record<EnvKey | FlagEnvKey, string | undefined>>
+
+export interface EnvValidationResult {
+  /** Always safe to read: missing/invalid required values fall back here. */
+  env: AppEnv
+  /** Human-readable problem summary, or `null` when everything is valid. */
+  configError: string | null
+  /** Required keys that were absent or blank. */
+  missing: EnvKey[]
+  /** Zod messages for values that were present but malformed. */
+  invalid: string[]
+}
+
+/**
+ * Values used only so the config error screen can render. The application is
+ * never mounted when `configError` is set, so these are not runtime defaults.
+ */
+const FALLBACK_ENV: AppEnv = {
+  VITE_API_URL: 'http://localhost:4000',
+  VITE_STELLAR_NETWORK: 'testnet',
+  VITE_APP_URL: 'http://localhost:5173',
+}
 
 /**
  * Single access point for the raw `import.meta.env` values. No other module in
  * the app should touch `import.meta.env` directly.
  */
-function readRawEnv(): Partial<Record<EnvKey | FlagEnvKey, string | undefined>> {
+function readRawEnv(): RawEnv {
   return {
     VITE_API_URL: import.meta.env.VITE_API_URL,
     VITE_STELLAR_NETWORK: import.meta.env.VITE_STELLAR_NETWORK,
@@ -42,44 +66,54 @@ function readRawEnv(): Partial<Record<EnvKey | FlagEnvKey, string | undefined>> 
   }
 }
 
-function formatIssues(error: z.ZodError<AppEnv>): string {
-  return error.issues
-    .map((issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`)
-    .join('\n')
+function isBlank(value: string | undefined): boolean {
+  return value === undefined || value.trim() === ''
 }
 
-function loadEnv(): { env: AppEnv; configError: string | null } {
-  const raw = readRawEnv()
+/**
+ * Validates a raw environment object without touching `import.meta.env`, which
+ * makes the failure modes testable and keeps the startup path deterministic.
+ */
+export function validateEnv(raw: RawEnv): EnvValidationResult {
+  const missing = REQUIRED_ENV_KEYS.filter((key) => isBlank(raw[key]))
+  const parsed = envSchema.safeParse(raw)
 
-  if (import.meta.env.DEV) {
-    const missing = REQUIRED_KEYS.filter((key) => raw[key] === undefined || raw[key] === '')
-    const validation = envSchema.safeParse(raw)
-
-    if (missing.length === 0 && validation.success) {
-      return { env: validation.data, configError: null }
-    }
-
-    const details = [
-      missing.length > 0
-        ? `Missing variables:\n${missing.map((key) => `  - ${key}`).join('\n')}`
-        : '',
-      !validation.success ? `Invalid values:\n${formatIssues(validation.error)}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n')
-
-    const message = [
-      'Invalid environment configuration.',
-      details,
-      'Copy .env.example to .env and fix the values, then restart the dev server.',
-    ].join('\n\n')
-
-    console.error(`[config:env] ${message}`)
-    return { env: envSchema.parse({}), configError: message }
+  if (missing.length === 0 && parsed.success) {
+    return { env: parsed.data, configError: null, missing: [], invalid: [] }
   }
 
-  // Production: safe defaults are used for anything that is not provided.
-  return { env: envSchema.parse(raw), configError: null }
+  const invalid = parsed.success
+    ? []
+    : parsed.error.issues
+        // Missing keys are already listed above; don't report them twice as
+        // "expected string, received undefined".
+        .filter((issue) => !missing.includes(issue.path[0] as EnvKey))
+        .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+
+  const details = [
+    missing.length > 0
+      ? `Missing variables:\n${missing.map((key) => `  - ${key}`).join('\n')}`
+      : '',
+    invalid.length > 0
+      ? `Invalid values:\n${invalid.map((issue) => `  - ${issue}`).join('\n')}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+
+  const configError = [
+    'Invalid environment configuration.',
+    details,
+    'Set every required variable in .env (see .env.example), then restart the app.',
+  ].join('\n\n')
+
+  return { env: FALLBACK_ENV, configError, missing, invalid }
+}
+
+function loadEnv(): EnvValidationResult {
+  const result = validateEnv(readRawEnv())
+  if (result.configError) console.error(`[config:env] ${result.configError}`)
+  return result
 }
 
 export const { env, configError } = loadEnv()

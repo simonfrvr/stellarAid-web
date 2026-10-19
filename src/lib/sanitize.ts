@@ -7,7 +7,7 @@
  * for plain-text form bodies this is sufficient and dependency-free.
  */
 
-const SCRIPT_OR_STYLE = /<\/?(script|style)[^>]*>/gi
+const SCRIPT_OR_STYLE = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi
 const ALL_TAGS = /<\/?[a-zA-Z][^>]*>/g
 const EVENT_ATTR = /\son\w+\s*=\s*(['"]).*?\1/gi
 const JS_URL = /javascript\s*:/gi

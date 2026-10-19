@@ -1,5 +1,6 @@
 import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios'
 import { env } from '@/config'
+import type { APIError } from '@/types'
 import type { ApiErrorDto } from '@/types/api'
 import { useUiStore } from '@/stores/useUiStore'
 
@@ -71,26 +72,48 @@ declare module 'axios' {
 }
 
 /** A normalized, user-readable representation of a failed API call. */
-export class ApiError extends Error {
-  readonly status: number | null
+export class ApiError extends Error implements APIError {
+  /** HTTP status, or `null` when no response was received. */
+  readonly statusCode: number | null
+  /** Alias kept for callers written before the shared APIError contract. */
+  get status(): number | null {
+    return this.statusCode
+  }
+
   readonly code: string
+  /** ISO-8601 timestamp for logs and support reports. */
+  readonly timestamp: string
   /** Per-field validation messages sent by the server, keyed by field name. */
   readonly fieldErrors: Record<string, string>
   readonly requestId: string | null
 
   constructor(
-    status: number | null,
+    statusCode: number | null,
     code: string,
     message: string,
     fieldErrors: Record<string, string> = {},
     requestId: string | null = null,
+    timestamp: string = new Date().toISOString(),
   ) {
     super(message)
     this.name = 'ApiError'
-    this.status = status
+    this.statusCode = statusCode
     this.code = code
+    this.timestamp = timestamp
     this.fieldErrors = fieldErrors
     this.requestId = requestId
+  }
+
+  /** Serializes to exactly the shared APIError contract. */
+  toJSON(): APIError {
+    return {
+      code: this.code,
+      message: this.message,
+      statusCode: this.statusCode,
+      timestamp: this.timestamp,
+      ...(Object.keys(this.fieldErrors).length > 0 ? { fieldErrors: this.fieldErrors } : {}),
+      ...(this.requestId !== null ? { requestId: this.requestId } : {}),
+    }
   }
 }
 
@@ -131,6 +154,7 @@ function parseFieldErrors(errors: FieldErrorsDto | undefined): Record<string, st
 }
 
 const API_ERROR_MESSAGES: Record<string, string> = {
+  UNKNOWN_ERROR: 'An unexpected error occurred.',
   AUTH_INVALID_CREDENTIALS: 'The email or password is incorrect.',
   AUTH_EMAIL_NOT_VERIFIED: 'Verify your email address before signing in.',
   AUTH_TOKEN_EXPIRED: 'Your session has expired. Please sign in again.',
@@ -149,6 +173,10 @@ const API_ERROR_MESSAGES: Record<string, string> = {
  * Maps an error code (with an HTTP status fallback) to user-facing copy.
  * `serverMessage` is the DTO's own message, used when no curated copy exists.
  */
+function apiErrorMessage(code: string): string {
+  return API_ERROR_MESSAGES[code] ?? 'The request could not be completed.'
+}
+
 export function getApiErrorMessage(
   code: string,
   status: number | null,
@@ -160,13 +188,13 @@ export function getApiErrorMessage(
   // it: the server's own message wins when present.
   if (own && (!mapped || code === 'HTTP_ERROR')) return own
   if (mapped) return mapped
-  if (status === 401) return API_ERROR_MESSAGES.AUTH_TOKEN_EXPIRED
-  if (status === 403) return API_ERROR_MESSAGES.AUTH_FORBIDDEN
-  if (status === 404) return API_ERROR_MESSAGES.RESOURCE_NOT_FOUND
-  if (status === 409) return API_ERROR_MESSAGES.RESOURCE_CONFLICT
-  if (status === 422) return API_ERROR_MESSAGES.VALIDATION_FAILED
-  if (status !== null && status >= 500) return API_ERROR_MESSAGES.INTERNAL_ERROR
-  return API_ERROR_MESSAGES.HTTP_ERROR
+  if (status === 401) return apiErrorMessage('AUTH_TOKEN_EXPIRED')
+  if (status === 403) return apiErrorMessage('AUTH_FORBIDDEN')
+  if (status === 404) return apiErrorMessage('RESOURCE_NOT_FOUND')
+  if (status === 409) return apiErrorMessage('RESOURCE_CONFLICT')
+  if (status === 422) return apiErrorMessage('VALIDATION_FAILED')
+  if (status !== null && status >= 500) return apiErrorMessage('INTERNAL_ERROR')
+  return apiErrorMessage('HTTP_ERROR')
 }
 
 function normalizeError(error: AxiosError): ApiError {
@@ -193,6 +221,16 @@ function normalizeError(error: AxiosError): ApiError {
   }
 
   return new ApiError(null, 'NETWORK_ERROR', getApiErrorMessage('NETWORK_ERROR', null))
+}
+
+/**
+ * Converts anything thrown by an API call into the shared `ApiError` shape,
+ * so UI code never has to branch on Axios vs. plain `Error` vs. unknown values.
+ */
+export function toApiError(error: unknown): ApiError {
+  if (error instanceof ApiError) return error
+  if (axios.isAxiosError(error)) return normalizeError(error)
+  return new ApiError(null, 'UNKNOWN_ERROR', apiErrorMessage('UNKNOWN_ERROR'))
 }
 
 function reportUnexpectedError(error: ApiError, request: AxiosRequestConfig | undefined): void {

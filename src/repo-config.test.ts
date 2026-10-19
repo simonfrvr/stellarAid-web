@@ -36,15 +36,17 @@ describe('repository configuration', () => {
 
   it('ships the husky hooks the contributing guide documents', () => {
     expect(read('.husky/pre-commit')).toContain('lint-staged')
-    expect(read('.husky/pre-push')).toContain('npm run type-check')
+    expect(read('.husky/pre-push')).toContain('npm run check')
     expect(read('CONTRIBUTING.md')).toContain('## Git Hooks')
   })
 
   it('only references repository paths that exist in CONTRIBUTING.md', () => {
-    const paths = [...read('CONTRIBUTING.md').matchAll(/`((?:src|\.husky)\/[A-Za-z0-9_./-]+)`/g)].map(
-      (match) => match[1] as string,
+    const paths = [
+      ...read('CONTRIBUTING.md').matchAll(/`((?:src|\.husky)\/[A-Za-z0-9_./-]+)`/g),
+    ].map((match) => match[1] as string)
+    const missing = paths.filter(
+      (path) => !path.includes('<') && !path.includes('...') && !existsSync(resolve(ROOT, path)),
     )
-    const missing = paths.filter((path) => !path.includes('<') && !path.includes('...') && !existsSync(resolve(ROOT, path)))
     expect(missing).toEqual([])
   })
 })
